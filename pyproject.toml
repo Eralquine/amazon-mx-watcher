@@ -7,7 +7,7 @@ name = "amazon-mx-watcher"
 version = "0.1.0"
 description = "Monitor de stock y precio para productos de amazon.com.mx, con notificaciones para compra manual."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = { text = "MIT" }
 dependencies = [
     "requests>=2.31",
