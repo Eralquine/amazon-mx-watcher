@@ -1,0 +1,18 @@
+# Copia este archivo a products.yaml y ajusta los valores.
+
+# Segundos entre cada ronda de revisión de todos los productos.
+# Se aplica un mínimo de 120 segundos para no saturar a Amazon.
+poll_interval_seconds: 600
+
+products:
+  - url: "https://www.amazon.com.mx/dp/B0EXAMPLE1"
+    nickname: "Consola X"
+    # Avisa cuando el precio caiga a este valor o menos. Deja "null" para ignorar precio.
+    target_price: 8999.00
+    # Avisa cuando el producto pase de "sin stock" a "en stock".
+    notify_on_restock: true
+
+  - url: "https://www.amazon.com.mx/dp/B0EXAMPLE2"
+    nickname: "Tarjeta gráfica"
+    target_price: null
+    notify_on_restock: true

@@ -1,0 +1,9 @@
+services:
+  watcher:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./products.yaml:/app/products.yaml:ro
+      - ./data:/app/data
+    restart: unless-stopped
