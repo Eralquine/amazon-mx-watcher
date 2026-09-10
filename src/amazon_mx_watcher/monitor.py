@@ -7,9 +7,15 @@ import time
 
 import requests
 
-from .config import AppConfig, ProductConfig
+from .config import AppConfig, ProductConfig, SearchConfig
 from .notifiers import EmailNotifier, Notifier, TelegramNotifier
-from .scraper import ScrapeBlockedError, fetch_product_page, parse_product_page
+from .scraper import (
+    ScrapeBlockedError,
+    fetch_product_page,
+    fetch_search_page,
+    parse_product_page,
+    parse_search_results,
+)
 from .storage import StateStore
 
 logger = logging.getLogger(__name__)
@@ -95,21 +101,71 @@ def check_product(
         )
 
 
+def check_search(
+    search: SearchConfig,
+    store: StateStore,
+    notifiers: list[Notifier],
+    session: requests.Session,
+) -> None:
+    try:
+        html = fetch_search_page(search.query, session=session)
+        results = parse_search_results(html)
+    except ScrapeBlockedError as exc:
+        logger.warning("Bloqueado por Amazon al buscar '%s': %s", search.nickname, exc)
+        return
+    except requests.RequestException as exc:
+        logger.warning("Error de red al buscar '%s': %s", search.nickname, exc)
+        return
+
+    is_first_check = not store.has_any_seen_for_query(search.query)
+    keywords = search.keywords
+
+    for item in results:
+        already_seen = store.has_seen_asin(search.query, item.asin)
+        store.mark_asin_seen(search.query, item.asin)
+
+        if already_seen or is_first_check:
+            continue
+
+        title = item.title or item.url
+        if keywords and not any(k in title.lower() for k in keywords):
+            continue
+        if search.max_price is not None and (item.price is None or item.price > search.max_price):
+            continue
+
+        price_text = f"${item.price:,.2f} MXN" if item.price is not None else "precio no disponible"
+        _notify_all(
+            notifiers,
+            subject=f"Nuevo resultado para '{search.nickname}'",
+            message=f"{title}\n{price_text}\n{item.url}",
+        )
+
+    if is_first_check:
+        logger.info(
+            "Búsqueda '%s': %d resultado(s) tomados como línea base (sin notificar)",
+            search.nickname,
+            len(results),
+        )
+
+
 def run_once(config: AppConfig, store: StateStore) -> None:
     notifiers = build_notifiers(config)
-    if not config.products:
-        logger.warning("No hay productos configurados en products.yaml")
+    if not config.products and not config.searches:
+        logger.warning("No hay productos ni búsquedas configuradas en products.yaml")
         return
 
     with requests.Session() as session:
         for product in config.products:
             check_product(product, store, notifiers, session)
+        for search in config.searches:
+            check_search(search, store, notifiers, session)
 
 
 def run_forever(config: AppConfig, store: StateStore) -> None:
     logger.info(
-        "Iniciando monitoreo de %d producto(s) cada %d segundos",
+        "Iniciando monitoreo de %d producto(s) y %d búsqueda(s) cada %d segundos",
         len(config.products),
+        len(config.searches),
         config.poll_interval_seconds,
     )
     while True:

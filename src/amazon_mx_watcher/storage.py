@@ -30,6 +30,16 @@ class StateStore:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS search_seen_asin (
+                query TEXT NOT NULL,
+                asin TEXT NOT NULL,
+                first_seen_at REAL NOT NULL,
+                PRIMARY KEY (query, asin)
+            )
+            """
+        )
         self._conn.commit()
 
     def get(self, url: str) -> ProductState | None:
@@ -55,6 +65,26 @@ class StateStore:
                 last_checked_at = excluded.last_checked_at
             """,
             (url, price, int(in_stock), time.time()),
+        )
+        self._conn.commit()
+
+    def has_any_seen_for_query(self, query: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM search_seen_asin WHERE query = ? LIMIT 1", (query,)
+        ).fetchone()
+        return row is not None
+
+    def has_seen_asin(self, query: str, asin: str) -> bool:
+        row = self._conn.execute(
+            "SELECT 1 FROM search_seen_asin WHERE query = ? AND asin = ?",
+            (query, asin),
+        ).fetchone()
+        return row is not None
+
+    def mark_asin_seen(self, query: str, asin: str) -> None:
+        self._conn.execute(
+            "INSERT OR IGNORE INTO search_seen_asin (query, asin, first_seen_at) VALUES (?, ?, ?)",
+            (query, asin, time.time()),
         )
         self._conn.commit()
 

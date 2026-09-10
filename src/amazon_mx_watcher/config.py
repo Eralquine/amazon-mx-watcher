@@ -22,6 +22,20 @@ class ProductConfig:
 
 
 @dataclass
+class SearchConfig:
+    """Vigila los resultados de búsqueda de Amazon MX en vez de una URL de producto fija.
+
+    Útil para productos que todavía no existen como listado (p. ej. un lanzamiento
+    aún no publicado): se avisa en cuanto aparece un resultado nuevo que coincide.
+    """
+
+    query: str
+    nickname: str
+    keywords: list[str] = field(default_factory=list)
+    max_price: float | None = None
+
+
+@dataclass
 class TelegramConfig:
     bot_token: str
     chat_id: str
@@ -41,6 +55,7 @@ class SmtpConfig:
 class AppConfig:
     poll_interval_seconds: int
     products: list[ProductConfig] = field(default_factory=list)
+    searches: list[SearchConfig] = field(default_factory=list)
     telegram: TelegramConfig | None = None
     smtp: SmtpConfig | None = None
 
@@ -100,9 +115,20 @@ def load_products_file(path: Path) -> AppConfig:
         for item in raw.get("products", [])
     ]
 
+    searches = [
+        SearchConfig(
+            query=item["query"],
+            nickname=item.get("nickname", item["query"]),
+            keywords=[str(k).lower() for k in item.get("keywords", [])],
+            max_price=(float(item["max_price"]) if item.get("max_price") is not None else None),
+        )
+        for item in raw.get("searches", [])
+    ]
+
     return AppConfig(
         poll_interval_seconds=poll_interval,
         products=products,
+        searches=searches,
         telegram=_telegram_config_from_env(),
         smtp=_smtp_config_from_env(),
     )
@@ -119,6 +145,15 @@ def save_products_file(path: Path, config: AppConfig) -> None:
                 "notify_on_restock": p.notify_on_restock,
             }
             for p in config.products
+        ],
+        "searches": [
+            {
+                "query": s.query,
+                "nickname": s.nickname,
+                "keywords": s.keywords,
+                "max_price": s.max_price,
+            }
+            for s in config.searches
         ],
     }
     path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")

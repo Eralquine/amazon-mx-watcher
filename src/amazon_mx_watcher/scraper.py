@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
+
+SEARCH_BASE_URL = "https://www.amazon.com.mx/s"
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -44,9 +47,30 @@ class ProductSnapshot:
     availability_text: str | None
 
 
+@dataclass
+class SearchResultItem:
+    asin: str
+    title: str | None
+    price: float | None
+    url: str
+
+
 def fetch_product_page(url: str, session: requests.Session | None = None) -> str:
     http = session or requests
     response = http.get(url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    return response.text
+
+
+def build_search_url(query: str) -> str:
+    return f"{SEARCH_BASE_URL}?k={quote_plus(query)}"
+
+
+def fetch_search_page(query: str, session: requests.Session | None = None) -> str:
+    http = session or requests
+    response = http.get(
+        build_search_url(query), headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT_SECONDS
+    )
     response.raise_for_status()
     return response.text
 
@@ -131,3 +155,37 @@ def _is_in_stock(availability_text: str | None, price: float | None) -> bool:
         return True
     # Sin texto explícito de disponibilidad: si hay precio visible, se asume en stock.
     return price is not None
+
+
+def parse_search_results(html: str) -> list[SearchResultItem]:
+    """Extrae los resultados de una página de búsqueda de amazon.com.mx."""
+    soup = BeautifulSoup(html, "lxml")
+
+    if _looks_like_block_page(soup):
+        raise ScrapeBlockedError(
+            "Amazon devolvió una página de verificación/CAPTCHA en vez de resultados. "
+            "Aumenta el intervalo de revisión e inténtalo más tarde."
+        )
+
+    items: list[SearchResultItem] = []
+    for node in soup.select("div[data-component-type='s-search-result']"):
+        asin = node.get("data-asin", "").strip()
+        if not asin:
+            continue
+
+        title_node = node.select_one("h2 span") or node.select_one("h2 a span")
+        title = title_node.get_text(strip=True) if title_node else None
+
+        price_node = node.select_one("span.a-price span.a-offscreen")
+        price = parse_price(price_node.get_text()) if price_node else None
+
+        items.append(
+            SearchResultItem(
+                asin=asin,
+                title=title,
+                price=price,
+                url=f"https://www.amazon.com.mx/dp/{asin}",
+            )
+        )
+
+    return items

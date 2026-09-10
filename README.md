@@ -1,8 +1,9 @@
 # Amazon MX Watcher
 
 Monitor de **stock y precio** para productos de [amazon.com.mx](https://www.amazon.com.mx), pensado para uso
-**personal**. Cuando un producto que te interesa vuelve a tener stock, o baja de un precio objetivo, la
-aplicación te avisa (Telegram y/o email) con un enlace directo para que **tú** completes la compra con un clic.
+**personal**. Cuando un producto que te interesa vuelve a tener stock, baja de un precio objetivo, **o aparece
+por primera vez** (útil para productos que todavía no se han publicado), la aplicación te avisa (Telegram y/o
+email) con un enlace directo para que **tú** completes la compra con un clic.
 
 ## Por qué no hace la compra automáticamente
 
@@ -53,6 +54,24 @@ products:
     nickname: "Tarjeta gráfica"
     target_price: null
     notify_on_restock: true
+
+searches:
+  - query: "consola X edición limitada"
+    nickname: "Consola X edición limitada"
+    keywords: ["edición limitada"]
+    max_price: 12000.00
+```
+
+### Producto que todavía no existe en Amazon
+
+Si el producto **aún no se ha publicado**, no hay URL que vigilar. En su lugar, agrega una **búsqueda**: la
+app corre esa búsqueda en amazon.com.mx en cada ronda y te avisa apenas aparezca un resultado nuevo (opcionalmente
+filtrado por palabras clave en el título y/o un precio máximo). La primera vez que se ejecuta una búsqueda, los
+resultados existentes se guardan como línea base sin notificar — solo se avisa de lo que aparece **después**.
+
+```bash
+python -m amazon_mx_watcher.cli add-search "consola X edición limitada" \
+    --keyword "edición limitada" --max-price 12000
 ```
 
 ### Notificaciones (`.env`)

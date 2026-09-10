@@ -16,3 +16,12 @@ products:
     nickname: "Tarjeta gráfica"
     target_price: null
     notify_on_restock: true
+
+# Búsquedas: para productos que AÚN NO EXISTEN como listado en Amazon.
+# Se avisa apenas aparezca un resultado nuevo que coincida con la consulta
+# (y, si los defines, con las palabras clave / precio máximo).
+searches:
+  - query: "consola X edición limitada"
+    nickname: "Consola X edición limitada"
+    keywords: ["edición limitada"]
+    max_price: 12000.00
